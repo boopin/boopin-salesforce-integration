@@ -3,10 +3,10 @@ import requests
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables from .env or Streamlit Secrets
 load_dotenv()
 
-# Salesforce credentials from secrets or .env
+# Salesforce credentials
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 USERNAME = os.getenv("USERNAME")
@@ -14,7 +14,7 @@ PASSWORD = os.getenv("PASSWORD")
 TOKEN_URL = os.getenv("TOKEN_URL")
 LEAD_API_PATH = "/services/apexrest/lead/createlead"
 
-# Authenticate and get access token
+# Get Salesforce access token
 def get_salesforce_token():
     payload = {
         "grant_type": "password",
@@ -27,7 +27,7 @@ def get_salesforce_token():
     response.raise_for_status()
     return response.json()
 
-# Send lead data to Salesforce
+# Send lead to Salesforce
 def send_lead(token_data, lead_payload):
     headers = {
         "Authorization": f"Bearer {token_data['access_token']}",
@@ -47,7 +47,6 @@ with st.form("lead_form"):
     email = st.text_input("Email", "john.doe@example.com")
     submitted = st.form_submit_button("Send Lead to Salesforce")
 
-# On submit
 if submitted:
     lead_data = {
         "Enquiry_Type": "Book_a_Test_Drive",
@@ -71,7 +70,8 @@ if submitted:
         "Marketing_Communication_Consent": "1",
         "Fund": "DD",
         "FormCode": "PET_Q2_25",
-        "Request_Origin": "https://www.jeep-saudi.com"  # ✅ Mandatory field added
+        "Request_Origin": "https://www.jeep-saudi.com",
+        "MasterKey": "Jeep_EN_GENERIC_RI:RP:TD_0_8_1_6_50_42"  # ✅ Added based on validation error
     }
 
     try:
