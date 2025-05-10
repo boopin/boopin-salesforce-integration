@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 import os
+import random
 from dotenv import load_dotenv
 from io import BytesIO
 
@@ -16,7 +17,7 @@ PASSWORD = os.getenv("PASSWORD")
 TOKEN_URL = os.getenv("TOKEN_URL")
 LEAD_API_PATH = "/services/apexrest/lead/createlead"
 
-# Helper: Get Salesforce token
+# Salesforce token
 def get_salesforce_token():
     payload = {
         "grant_type": "password",
@@ -29,7 +30,7 @@ def get_salesforce_token():
     response.raise_for_status()
     return response.json()
 
-# Helper: Send a lead
+# Send lead data
 def send_lead(token_data, lead_payload):
     headers = {
         "Authorization": f"Bearer {token_data['access_token']}",
@@ -39,7 +40,7 @@ def send_lead(token_data, lead_payload):
     response = requests.post(instance_url + LEAD_API_PATH, headers=headers, json=lead_payload)
     return response.status_code, response.text
 
-# Sample CSV generation
+# Generate sample CSVs
 def generate_sample_csv():
     data = {
         "Firstname": ["Ali", "Sara"],
@@ -48,12 +49,9 @@ def generate_sample_csv():
         "Email": ["ali@example.com", "sara@example.com"]
     }
     df = pd.DataFrame(data)
-    tiktok = df.to_csv(index=False).encode('utf-8')
-    snapchat = df.to_csv(index=False).encode('utf-8')
-    return tiktok, snapchat
+    return df.to_csv(index=False).encode('utf-8'), df.to_csv(index=False).encode('utf-8')
 
-# ------------------ UI Starts ------------------ #
-# Header
+# UI starts
 col1, col2 = st.columns([1, 6])
 with col1:
     st.image("https://i.imgur.com/CsnXPLZ.jpeg", width=100)
@@ -63,13 +61,14 @@ with col2:
 token = None
 campaign_list = ["PET-Q2-2025", "PET-Summer-2025", "PET-Offers-2025"]
 
-# Manual Form
+# Manual lead form with dummy data
 with st.expander("📤 Submit Single Lead Manually"):
+    rand_id = random.randint(1000, 9999)
     with st.form("manual_form"):
-        firstname = st.text_input("First Name", "John")
-        lastname = st.text_input("Last Name", "Doe")
-        mobile = st.text_input("Mobile", "0512345678")
-        email = st.text_input("Email", "john.doe@example.com")
+        firstname = st.text_input("First Name", f"Test{rand_id}")
+        lastname = st.text_input("Last Name", "User")
+        mobile = st.text_input("Mobile", f"05123{rand_id}")
+        email = st.text_input("Email", f"test{rand_id}@example.com")
         selected_campaign = st.selectbox("Select Campaign", campaign_list)
         submit_manual = st.form_submit_button("Send Lead to Salesforce")
 
@@ -110,7 +109,7 @@ with st.expander("📤 Submit Single Lead Manually"):
         except Exception as e:
             st.error(f"Error: {str(e)}")
 
-# CSV Uploads for TikTok and Snapchat
+# Upload from TikTok and Snapchat
 st.markdown("### 📁 Upload Leads from TikTok and Snapchat")
 
 for platform in ["TikTok", "Snapchat"]:
@@ -186,13 +185,12 @@ for platform in ["TikTok", "Snapchat"]:
                 failed_csv = failed_df.to_csv(index=False).encode('utf-8')
                 st.download_button(f"⬇️ Download Failed {platform} Leads", failed_csv, f"{platform.lower()}_failed.csv", "text/csv", key=f"{platform}_failed")
 
-# ------------------
-# Sidebar: Theme + Sample CSVs
-# ------------------
+# Sidebar: Theme & Sample Downloads
 st.sidebar.title("⚙️ Settings & Downloads")
 theme = st.sidebar.selectbox("🌗 Theme Mode", ["Light", "Dark", "Follow System"])
-st.sidebar.caption("Use ⚙️ Settings in Streamlit header to apply the selected theme manually.")
+st.sidebar.caption("Use ⚙️ menu at the top-right to apply theme.")
 
+# Sample CSVs
 tiktok_sample, snapchat_sample = generate_sample_csv()
 st.sidebar.download_button("📥 Sample TikTok CSV", tiktok_sample, "sample_tiktok_leads.csv", "text/csv")
 st.sidebar.download_button("📥 Sample Snapchat CSV", snapchat_sample, "sample_snapchat_leads.csv", "text/csv")
