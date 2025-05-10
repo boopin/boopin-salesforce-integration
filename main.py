@@ -3,7 +3,6 @@ import requests
 import pandas as pd
 import os
 from dotenv import load_dotenv
-from io import BytesIO
 
 load_dotenv()
 
@@ -35,11 +34,19 @@ def send_lead(token_data, lead_payload):
     response = requests.post(instance_url + LEAD_API_PATH, headers=headers, json=lead_payload)
     return response.status_code, response.text
 
-st.title("Boopin → Salesforce Lead Integration")
+# App logo + title + theme toggle
+col1, col2 = st.columns([1, 6])
+with col1:
+    st.image("https://i.imgur.com/CsnXPLZ.jpeg", width=100)
+with col2:
+    st.title("Boopin → Salesforce Lead Integration")
+
+theme_choice = st.selectbox("🌗 Theme Preference (select in ⚙️ Settings → Theme):", ["Light", "Dark", "Follow System"])
+st.caption("Use Streamlit’s top-right ⚙️ menu → **Settings → Theme** to apply your preferred mode.")
 
 token = None
 
-# Manual form
+# Manual form section
 with st.expander("📤 Submit Single Lead Manually"):
     with st.form("manual_form"):
         firstname = st.text_input("First Name", "John")
@@ -62,13 +69,13 @@ with st.expander("📤 Submit Single Lead Manually"):
             "Line": "Wrangler",
             "Entry_Form": "EN",
             "Market": "Saudi Arabia",
-            "Campaign_Source": "Display",
+            "Campaign_Source": "Manual",
             "Campaign_Name": "PET-Q2-2025",
             "Campaign_Medium": "Boopin",
             "TestDriveType": "In Showroom",
             "Extended_Privacy": "true",
             "Purchase_TimeFrame": "More than 3 months",
-            "Source_Site": "Snapchat Ads",
+            "Source_Site": "manual entry",
             "Marketing_Communication_Consent": "1",
             "Fund": "DD",
             "FormCode": "PET_Q2_25",
@@ -79,34 +86,35 @@ with st.expander("📤 Submit Single Lead Manually"):
         try:
             status, resp = send_lead(token, lead_data)
             if status == 200:
-                st.success("Lead sent successfully!")
+                st.success("✅ Lead sent successfully!")
             else:
-                st.error(f"Failed. Status {status}, Response: {resp}")
+                st.error(f"❌ Failed. Status {status}, Response: {resp}")
         except Exception as e:
             st.error(f"Error: {str(e)}")
 
-# -------------------------------
-# CSV Upload Section
-# -------------------------------
-st.markdown("### 📁 Upload CSV of Leads")
+# Multiple platform uploads
+st.markdown("### 📁 Upload Leads from TikTok and Snapchat")
 
-uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+for platform in ["TikTok", "Snapchat"]:
+    st.subheader(f"{platform} Leads")
 
-if uploaded_file:
-    df = pd.read_csv(uploaded_file)
+    uploaded_file = st.file_uploader(f"Upload {platform} CSV", type="csv", key=f"{platform}_file")
 
-    # CSV Validation
-    required_cols = {"Firstname", "Lastname", "Mobile", "Email"}
-    if not required_cols.issubset(df.columns):
-        st.error(f"CSV must include these columns: {', '.join(required_cols)}")
-    else:
-        # Preview option
-        if st.checkbox("🔍 Preview full CSV"):
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
+
+        required_cols = {"Firstname", "Lastname", "Mobile", "Email"}
+        if not required_cols.issubset(df.columns):
+            st.error(f"CSV must include these columns: {', '.join(required_cols)}")
+            continue
+
+        # Preview toggle
+        if st.checkbox(f"🔍 Preview full {platform} CSV", key=f"{platform}_preview"):
             st.dataframe(df)
         else:
             st.dataframe(df.head())
 
-        if st.button("📤 Send All Leads to Salesforce"):
+        if st.button(f"📤 Send {platform} Leads to Salesforce", key=f"{platform}_submit"):
             token = token or get_salesforce_token()
             results = []
 
@@ -123,13 +131,13 @@ if uploaded_file:
                     "Line": "Wrangler",
                     "Entry_Form": "EN",
                     "Market": "Saudi Arabia",
-                    "Campaign_Source": "Display",
+                    "Campaign_Source": platform,
                     "Campaign_Name": "PET-Q2-2025",
                     "Campaign_Medium": "Boopin",
                     "TestDriveType": "In Showroom",
                     "Extended_Privacy": "true",
                     "Purchase_TimeFrame": "More than 3 months",
-                    "Source_Site": "Snapchat Ads",
+                    "Source_Site": f"{platform.lower()} Ads",
                     "Marketing_Communication_Consent": "1",
                     "Fund": "DD",
                     "FormCode": "PET_Q2_25",
@@ -147,17 +155,16 @@ if uploaded_file:
                     results.append({**row, "Status": "Failed", "Message": str(e)})
 
             result_df = pd.DataFrame(results)
-            st.success(f"✅ {sum(result_df['Status'] == 'Success')} leads sent successfully.")
-            st.warning(f"⚠️ {sum(result_df['Status'] == 'Failed')} leads failed.")
-
+            st.success(f"✅ {platform}: {sum(result_df['Status'] == 'Success')} leads sent.")
+            st.warning(f"⚠️ {platform}: {sum(result_df['Status'] == 'Failed')} failed.")
             st.dataframe(result_df)
 
             # Download full log
             full_log_csv = result_df.to_csv(index=False).encode('utf-8')
-            st.download_button("⬇️ Download Full Log", full_log_csv, "submission_log.csv", "text/csv")
+            st.download_button(f"⬇️ Download {platform} Log", full_log_csv, f"{platform.lower()}_submission_log.csv", "text/csv", key=f"{platform}_log")
 
             # Download only failed rows
             failed_df = result_df[result_df["Status"] == "Failed"]
             if not failed_df.empty:
                 failed_csv = failed_df.to_csv(index=False).encode('utf-8')
-                st.download_button("⬇️ Download Failed Rows", failed_csv, "failed_leads.csv", "text/csv")
+                st.download_button(f"⬇️ Download Failed {platform} Leads", failed_csv, f"{platform.lower()}_failed.csv", "text/csv", key=f"{platform}_failed")
