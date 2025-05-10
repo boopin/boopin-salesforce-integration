@@ -3,9 +3,12 @@ import requests
 import pandas as pd
 import os
 from dotenv import load_dotenv
+from io import BytesIO
 
+# Load environment variables
 load_dotenv()
 
+# Salesforce credentials
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 USERNAME = os.getenv("USERNAME")
@@ -13,6 +16,7 @@ PASSWORD = os.getenv("PASSWORD")
 TOKEN_URL = os.getenv("TOKEN_URL")
 LEAD_API_PATH = "/services/apexrest/lead/createlead"
 
+# Helper: Get Salesforce token
 def get_salesforce_token():
     payload = {
         "grant_type": "password",
@@ -25,6 +29,7 @@ def get_salesforce_token():
     response.raise_for_status()
     return response.json()
 
+# Helper: Send a lead
 def send_lead(token_data, lead_payload):
     headers = {
         "Authorization": f"Bearer {token_data['access_token']}",
@@ -34,25 +39,38 @@ def send_lead(token_data, lead_payload):
     response = requests.post(instance_url + LEAD_API_PATH, headers=headers, json=lead_payload)
     return response.status_code, response.text
 
-# App logo + title + theme toggle
+# Sample CSV generation
+def generate_sample_csv():
+    data = {
+        "Firstname": ["Ali", "Sara"],
+        "Lastname": ["Naveed", "Khan"],
+        "Mobile": ["0512345678", "0512345679"],
+        "Email": ["ali@example.com", "sara@example.com"]
+    }
+    df = pd.DataFrame(data)
+    tiktok = df.to_csv(index=False).encode('utf-8')
+    snapchat = df.to_csv(index=False).encode('utf-8')
+    return tiktok, snapchat
+
+# ------------------ UI Starts ------------------ #
+# Header
 col1, col2 = st.columns([1, 6])
 with col1:
     st.image("https://i.imgur.com/CsnXPLZ.jpeg", width=100)
 with col2:
     st.title("Boopin → Salesforce Lead Integration")
 
-theme_choice = st.selectbox("🌗 Theme Preference (select in ⚙️ Settings → Theme):", ["Light", "Dark", "Follow System"])
-st.caption("Use Streamlit’s top-right ⚙️ menu → **Settings → Theme** to apply your preferred mode.")
-
 token = None
+campaign_list = ["PET-Q2-2025", "PET-Summer-2025", "PET-Offers-2025"]
 
-# Manual form section
+# Manual Form
 with st.expander("📤 Submit Single Lead Manually"):
     with st.form("manual_form"):
         firstname = st.text_input("First Name", "John")
         lastname = st.text_input("Last Name", "Doe")
         mobile = st.text_input("Mobile", "0512345678")
         email = st.text_input("Email", "john.doe@example.com")
+        selected_campaign = st.selectbox("Select Campaign", campaign_list)
         submit_manual = st.form_submit_button("Send Lead to Salesforce")
 
     if submit_manual:
@@ -70,7 +88,7 @@ with st.expander("📤 Submit Single Lead Manually"):
             "Entry_Form": "EN",
             "Market": "Saudi Arabia",
             "Campaign_Source": "Manual",
-            "Campaign_Name": "PET-Q2-2025",
+            "Campaign_Name": selected_campaign,
             "Campaign_Medium": "Boopin",
             "TestDriveType": "In Showroom",
             "Extended_Privacy": "true",
@@ -92,7 +110,7 @@ with st.expander("📤 Submit Single Lead Manually"):
         except Exception as e:
             st.error(f"Error: {str(e)}")
 
-# Multiple platform uploads
+# CSV Uploads for TikTok and Snapchat
 st.markdown("### 📁 Upload Leads from TikTok and Snapchat")
 
 for platform in ["TikTok", "Snapchat"]:
@@ -105,10 +123,11 @@ for platform in ["TikTok", "Snapchat"]:
 
         required_cols = {"Firstname", "Lastname", "Mobile", "Email"}
         if not required_cols.issubset(df.columns):
-            st.error(f"CSV must include these columns: {', '.join(required_cols)}")
+            st.error(f"CSV must include: {', '.join(required_cols)}")
             continue
 
-        # Preview toggle
+        selected_campaign = st.selectbox(f"Select Campaign for {platform}", campaign_list, key=f"{platform}_campaign")
+
         if st.checkbox(f"🔍 Preview full {platform} CSV", key=f"{platform}_preview"):
             st.dataframe(df)
         else:
@@ -132,7 +151,7 @@ for platform in ["TikTok", "Snapchat"]:
                     "Entry_Form": "EN",
                     "Market": "Saudi Arabia",
                     "Campaign_Source": platform,
-                    "Campaign_Name": "PET-Q2-2025",
+                    "Campaign_Name": selected_campaign,
                     "Campaign_Medium": "Boopin",
                     "TestDriveType": "In Showroom",
                     "Extended_Privacy": "true",
@@ -159,12 +178,21 @@ for platform in ["TikTok", "Snapchat"]:
             st.warning(f"⚠️ {platform}: {sum(result_df['Status'] == 'Failed')} failed.")
             st.dataframe(result_df)
 
-            # Download full log
             full_log_csv = result_df.to_csv(index=False).encode('utf-8')
             st.download_button(f"⬇️ Download {platform} Log", full_log_csv, f"{platform.lower()}_submission_log.csv", "text/csv", key=f"{platform}_log")
 
-            # Download only failed rows
             failed_df = result_df[result_df["Status"] == "Failed"]
             if not failed_df.empty:
                 failed_csv = failed_df.to_csv(index=False).encode('utf-8')
                 st.download_button(f"⬇️ Download Failed {platform} Leads", failed_csv, f"{platform.lower()}_failed.csv", "text/csv", key=f"{platform}_failed")
+
+# ------------------
+# Sidebar: Theme + Sample CSVs
+# ------------------
+st.sidebar.title("⚙️ Settings & Downloads")
+theme = st.sidebar.selectbox("🌗 Theme Mode", ["Light", "Dark", "Follow System"])
+st.sidebar.caption("Use ⚙️ Settings in Streamlit header to apply the selected theme manually.")
+
+tiktok_sample, snapchat_sample = generate_sample_csv()
+st.sidebar.download_button("📥 Sample TikTok CSV", tiktok_sample, "sample_tiktok_leads.csv", "text/csv")
+st.sidebar.download_button("📥 Sample Snapchat CSV", snapchat_sample, "sample_snapchat_leads.csv", "text/csv")
