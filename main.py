@@ -1,3 +1,4 @@
+
 import streamlit as st
 import requests
 import pandas as pd
@@ -13,6 +14,9 @@ USERNAME = os.getenv("USERNAME")
 PASSWORD = os.getenv("PASSWORD")
 TOKEN_URL = os.getenv("TOKEN_URL")
 LEAD_API_PATH = "/services/apexrest/lead/createlead"
+
+# Global error log
+error_log = []
 
 # Token and send helpers
 def get_salesforce_token():
@@ -60,41 +64,44 @@ with st.expander("📥 Submit a Test Lead"):
         submit_manual = st.form_submit_button("Send Lead to Salesforce")
 
     if submit_manual:
-        token = get_salesforce_token()
-        lead_data = {
-            "Enquiry_Type": "Book_a_Test_Drive",
-            "Firstname": firstname,
-            "Lastname": lastname,
-            "Mobile": mobile,
-            "Email": email,
-            "DealerCode": "PTC",
-            "Shrm_SvCtr": "PETROMIN Jubail",
-            "Make": "Jeep",
-            "Line": "Wrangler",
-            "Entry_Form": "EN",
-            "Market": "Saudi Arabia",
-            "Campaign_Source": "Manual",
-            "Campaign_Name": selected_campaign,
-            "Campaign_Medium": "Boopin",
-            "TestDriveType": "In Showroom",
-            "Extended_Privacy": "true",
-            "Purchase_TimeFrame": "More than 3 months",
-            "Source_Site": "manual entry",
-            "Marketing_Communication_Consent": "1",
-            "Fund": "DD",
-            "FormCode": "PET_Q2_25",
-            "Request_Origin": "https://www.jeep-saudi.com",
-            "MasterKey": "Jeep_EN_GENERIC_RI:RP:TD_0_8_1_6_50_42"
-        }
-
         try:
+            token = get_salesforce_token()
+            lead_data = {
+                "Enquiry_Type": "Book_a_Test_Drive",
+                "Firstname": firstname,
+                "Lastname": lastname,
+                "Mobile": mobile,
+                "Email": email,
+                "DealerCode": "PTC",
+                "Shrm_SvCtr": "PETROMIN Jubail",
+                "Make": "Jeep",
+                "Line": "Wrangler",
+                "Entry_Form": "EN",
+                "Market": "Saudi Arabia",
+                "Campaign_Source": "Manual",
+                "Campaign_Name": selected_campaign,
+                "Campaign_Medium": "Boopin",
+                "TestDriveType": "In Showroom",
+                "Extended_Privacy": "true",
+                "Purchase_TimeFrame": "More than 3 months",
+                "Source_Site": "manual entry",
+                "Marketing_Communication_Consent": "1",
+                "Fund": "DD",
+                "FormCode": "PET_Q2_25",
+                "Request_Origin": "https://www.jeep-saudi.com",
+                "MasterKey": "Jeep_EN_GENERIC_RI:RP:TD_0_8_1_6_50_42"
+            }
             status, resp = send_lead(token, lead_data)
             if status == 200:
                 st.success("✅ Lead sent successfully!")
             else:
-                st.error(f"❌ Failed. Status {status}, Response: {resp}")
+                err_msg = f"❌ Failed. Status {status}, Response: {resp}"
+                st.error(err_msg)
+                error_log.append({"Section": "Manual", "Error": err_msg})
         except Exception as e:
-            st.error(f"Error: {str(e)}")
+            err_msg = f"Manual Submission Error: {str(e)}"
+            st.error(err_msg)
+            error_log.append({"Section": "Manual", "Error": err_msg})
 
 # Uploads
 st.markdown("---")
@@ -109,7 +116,9 @@ for platform in ["TikTok", "Snapchat"]:
 
             required_cols = {"Firstname", "Lastname", "Mobile", "Email"}
             if not required_cols.issubset(df.columns):
-                st.error(f"CSV must include: {', '.join(required_cols)}")
+                err_msg = f"CSV must include: {', '.join(required_cols)}"
+                st.error(err_msg)
+                error_log.append({"Section": platform, "Error": err_msg})
                 continue
 
             selected_campaign = st.selectbox(f"Select Campaign for {platform}", campaign_list, key=f"{platform}_campaign")
@@ -155,9 +164,13 @@ for platform in ["TikTok", "Snapchat"]:
                         if status == 200:
                             results.append({**row, "Status": "Success", "Message": "Lead sent"})
                         else:
-                            results.append({**row, "Status": "Failed", "Message": f"{resp}"})
+                            fail_msg = f"{resp}"
+                            results.append({**row, "Status": "Failed", "Message": fail_msg})
+                            error_log.append({"Section": platform, "Error": f"Row {i}: {fail_msg}"})
                     except Exception as e:
+                        err_msg = f"{platform} Lead Error (row {i}): {str(e)}"
                         results.append({**row, "Status": "Failed", "Message": str(e)})
+                        error_log.append({"Section": platform, "Error": err_msg})
 
                 result_df = pd.DataFrame(results)
                 st.success(f"✅ {platform}: {sum(result_df['Status'] == 'Success')} leads sent.")
@@ -171,6 +184,13 @@ for platform in ["TikTok", "Snapchat"]:
                 if not failed_df.empty:
                     failed_csv = failed_df.to_csv(index=False).encode('utf-8')
                     st.download_button(f"⬇️ Download Failed {platform} Leads", failed_csv, f"{platform.lower()}_failed.csv", "text/csv", key=f"{platform}_failed")
+
+# Show error log if any
+if error_log:
+    st.markdown("---")
+    st.markdown("## 🛑 Error Log (Live)")
+    error_df = pd.DataFrame(error_log)
+    st.dataframe(error_df)
 
 # Theme selector (sidebar only)
 st.sidebar.title("🎨 Appearance")
