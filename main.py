@@ -97,11 +97,13 @@ with st.expander("📥 Submit a Test Lead"):
             else:
                 err_msg = f"❌ Failed. Status {status}, Response: {resp}"
                 st.error(err_msg)
-                error_log.append({"Section": "Manual", "Error": err_msg})
+                from datetime import datetime
+            error_log.append({"Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Section": "Manual", "Error": err_msg})
         except Exception as e:
             err_msg = f"Manual Submission Error: {str(e)}"
             st.error(err_msg)
-            error_log.append({"Section": "Manual", "Error": err_msg})
+            from datetime import datetime
+            error_log.append({"Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Section": "Manual", "Error": err_msg})
 
 # Uploads
 st.markdown("---")
@@ -118,7 +120,8 @@ for platform in ["TikTok", "Snapchat"]:
             if not required_cols.issubset(df.columns):
                 err_msg = f"CSV must include: {', '.join(required_cols)}"
                 st.error(err_msg)
-                error_log.append({"Section": platform, "Error": err_msg})
+                from datetime import datetime
+                error_log.append({"Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Section": platform, "Error": err_msg})
                 continue
 
             selected_campaign = st.selectbox(f"Select Campaign for {platform}", campaign_list, key=f"{platform}_campaign")
@@ -166,11 +169,13 @@ for platform in ["TikTok", "Snapchat"]:
                         else:
                             fail_msg = f"{resp}"
                             results.append({**row, "Status": "Failed", "Message": fail_msg})
-                            error_log.append({"Section": platform, "Error": f"Row {i}: {fail_msg}"})
+                            from datetime import datetime
+                            error_log.append({"Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Section": platform, "Error": f"Row {i}: {fail_msg}"})
                     except Exception as e:
                         err_msg = f"{platform} Lead Error (row {i}): {str(e)}"
                         results.append({**row, "Status": "Failed", "Message": str(e)})
-                        error_log.append({"Section": platform, "Error": err_msg})
+                        from datetime import datetime
+                error_log.append({"Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Section": platform, "Error": err_msg})
 
                 result_df = pd.DataFrame(results)
                 st.success(f"✅ {platform}: {sum(result_df['Status'] == 'Success')} leads sent.")
@@ -191,6 +196,8 @@ if error_log:
     st.markdown("## 🛑 Error Log (Live)")
     error_df = pd.DataFrame(error_log)
     st.dataframe(error_df)
+error_csv = error_df.to_csv(index=False).encode('utf-8')
+    st.download_button("⬇️ Download Error Log", error_csv, "error_log.csv", "text/csv", key="error_log_download")
 
 # Theme selector (sidebar only)
 st.sidebar.title("🎨 Appearance")
